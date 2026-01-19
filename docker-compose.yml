@@ -1,0 +1,28 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: whitebull
+      POSTGRES_USER: whitebull
+      POSTGRES_PASSWORD: whitebull
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql://whitebull:whitebull@postgres:5432/whitebull
+      PORT: 3000
+    ports:
+      - '3000:3000'
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
