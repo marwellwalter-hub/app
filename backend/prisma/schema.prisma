@@ -1,0 +1,249 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  REP
+}
+
+enum CustomerChannel {
+  ATACADO
+  VAREJO
+}
+
+enum CustomerNetwork {
+  ATACADAO
+  ASSAI
+  CARREFOUR
+  OUTROS
+}
+
+enum QuoteStatus {
+  DRAFT
+  CONVERTED
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_SYNC
+  SENT
+  FAILED
+}
+
+enum PriceTableType {
+  PADRAO
+  PROMOCIONAL
+}
+
+enum PaymentTermType {
+  AVISTA
+  PARCELADO
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  repProfile   Rep?
+}
+
+model Rep {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  maxDiscountPct    Float    @default(0)
+  defaultPriceTable String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id])
+}
+
+model Customer {
+  id                  String          @id @default(uuid())
+  legalName           String
+  tradeName           String?
+  cnpj                String          @unique
+  ie                  String?
+  customerType        String
+  channel             CustomerChannel
+  network             CustomerNetwork
+  segment             String?
+  buyerName           String?
+  buyerPhone          String?
+  buyerEmail          String?
+  paymentTermId       String?
+  creditLimit         Float?
+  notes               String?
+  active              Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  address             Address?
+  responsibleRepId    String?
+  responsibleRep      Rep?            @relation(fields: [responsibleRepId], references: [id])
+  paymentTerm         PaymentTerm?    @relation(fields: [paymentTermId], references: [id])
+  orders              Order[]
+  quotes              Quote[]
+}
+
+model Address {
+  id         String   @id @default(uuid())
+  customerId String   @unique
+  cep        String
+  street     String
+  number     String
+  complement String?
+  district   String
+  city       String
+  state      String
+  customer   Customer @relation(fields: [customerId], references: [id])
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  sku           String   @unique
+  ean           String?
+  name          String
+  brand         String
+  category      String?
+  weightVolume  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  priceItems    PriceTableItem[]
+}
+
+model PriceTable {
+  id          String          @id @default(uuid())
+  name        String
+  type        PriceTableType
+  channel     CustomerChannel
+  network     CustomerNetwork
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  items       PriceTableItem[]
+}
+
+model PriceTableItem {
+  id           String     @id @default(uuid())
+  priceTableId String
+  productId    String
+  price        Float
+  priceTable   PriceTable @relation(fields: [priceTableId], references: [id])
+  product      Product    @relation(fields: [productId], references: [id])
+
+  @@unique([priceTableId, productId])
+}
+
+model Quote {
+  id            String       @id @default(uuid())
+  customerId    String
+  status        QuoteStatus  @default(DRAFT)
+  subtotal      Float        @default(0)
+  discountTotal Float        @default(0)
+  freight       Float        @default(0)
+  total         Float        @default(0)
+  paymentTermId String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  customer      Customer     @relation(fields: [customerId], references: [id])
+  items         QuoteItem[]
+  paymentTerm   PaymentTerm? @relation(fields: [paymentTermId], references: [id])
+}
+
+model QuoteItem {
+  id        String  @id @default(uuid())
+  quoteId   String
+  productId String
+  quantity  Int
+  unitPrice Float
+  discount  Float   @default(0)
+  total     Float
+  quote     Quote   @relation(fields: [quoteId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@unique([quoteId, productId])
+}
+
+model Order {
+  id            String       @id @default(uuid())
+  customerId    String
+  status        OrderStatus  @default(DRAFT)
+  subtotal      Float        @default(0)
+  discountTotal Float        @default(0)
+  freight       Float        @default(0)
+  total         Float        @default(0)
+  paymentTermId String?
+  freightType   String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  customer      Customer     @relation(fields: [customerId], references: [id])
+  items         OrderItem[]
+  paymentTerm   PaymentTerm? @relation(fields: [paymentTermId], references: [id])
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  unitPrice Float
+  discount  Float   @default(0)
+  total     Float
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@unique([orderId, productId])
+}
+
+model PaymentTerm {
+  id          String          @id @default(uuid())
+  name        String
+  type        PaymentTermType
+  schedule    String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  customers   Customer[]
+  quotes      Quote[]
+  orders      Order[]
+}
+
+model SyncJob {
+  id          String   @id @default(uuid())
+  entityType  String
+  entityId    String
+  status      String
+  attempts    Int      @default(0)
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BlingCredential {
+  id           String   @id @default(uuid())
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model BlingMapping {
+  id             String   @id @default(uuid())
+  localEntity    String
+  localId        String
+  blingEntity    String
+  blingId        String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([localEntity, localId])
+}
